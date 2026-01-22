@@ -10,6 +10,8 @@ class sessionPhoto extends Model
     //
     use HasUlid;
 
+    protected $table = 'table_session_photo';
+
     protected $hidden = ['id'];
 
     protected $fillable = [

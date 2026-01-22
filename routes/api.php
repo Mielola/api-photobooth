@@ -1,12 +1,26 @@
 <?php
 
+use App\Http\Controllers\AcaraController;
 use App\Http\Controllers\AuthController;
-use Illuminate\Http\Request;
+use App\Http\Controllers\FrameController;
 use Illuminate\Support\Facades\Route;
 
 // Group API routes related to authentication
 Route::post('/login', [AuthController::class, 'login']);
 
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
+// Route khusus untuk sudah terautentikasi
+Route::middleware('auth:sanctum')->group(function () {
+    // Acara
+    Route::post('/acara/create', [AcaraController::class, 'create']);
+    Route::delete('/acara/delete/{uid}', [AcaraController::class, 'delete']);
+    Route::post('/acara/update/{uid}', [AcaraController::class, 'update']);
+    Route::get('/acara/index', [AcaraController::class, 'index']);
+    Route::get('/acara/{uid}', [AcaraController::class, 'show']);
+
+    // Frame
+    Route::post('/frame/create', [FrameController::class, 'create']);
+    Route::get('/frame/index', [FrameController::class, 'index']);
+    Route::get('/frame/{uid}', [FrameController::class, 'show']);
+    Route::delete('/frame/delete/{uid}', [FrameController::class, 'delete']);
+    Route::post('/frame/update/{uid}', [FrameController::class, 'update']);
+});

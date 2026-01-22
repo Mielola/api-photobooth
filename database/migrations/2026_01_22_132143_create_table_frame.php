@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->ulid('uid')->unique();
             $table->string('nama_frame', 100);
+            $table->string('photo', 100);
             $table->integer('jumlah_foto');
             $table->foreignId('acara_id')->constrained('table_acara')->onDelete('cascade');
             $table->timestamps();

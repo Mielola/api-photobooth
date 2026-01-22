@@ -10,6 +10,8 @@ class session extends Model
     //
     use HasUlid;
 
+    protected $table = 'table_session';
+
     protected $hidden = ['id'];
 
     protected $fillable = [

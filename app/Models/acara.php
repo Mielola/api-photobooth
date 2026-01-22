@@ -9,6 +9,8 @@ class acara extends Model
 {
     use HasUlid;
 
+    protected $table = 'table_acara';
+
     protected $hidden = ['id'];
 
     protected $fillable = [

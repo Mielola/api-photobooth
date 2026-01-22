@@ -10,6 +10,8 @@ class frame extends Model
     //
     use HasUlid;
 
+    protected $table = 'table_frame';
+
     protected $hidden = ['id'];
 
     protected $fillable = [
