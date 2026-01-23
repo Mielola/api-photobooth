@@ -10,6 +10,25 @@ use Illuminate\Support\Facades\Route;
 // Group API routes related to authentication
 Route::post('/login', [AuthController::class, 'login']);
 
+Route::prefix('client')->group(function () {
+    // Session
+    Route::post('/session/create', [SessionController::class, 'create']);
+    Route::get('/session/{uid}', [SessionController::class, 'show']);
+    Route::put('/session/{uid}/email', [SessionController::class, 'updateEmail']);
+    Route::get('/session/{uid}/check', [SessionController::class, 'checkActive']);
+
+    //Photo
+    Route::post('/photo/upload-original', [PhotoController::class, 'uploadOriginal']);
+    Route::post('/photo/upload-framed', [PhotoController::class, 'uploadFramed']);
+    Route::get('/photo/session/{session_uid}', [PhotoController::class, 'getBySession']);
+    Route::get('/photo/session/{session_uid}/type/{type}', [PhotoController::class, 'getByType']);
+    Route::post('/photo/{uid}/retake', [PhotoController::class, 'retake']);
+    Route::delete('/photo/{uid}', [PhotoController::class, 'delete']);
+    Route::get('/photo/{uid}/download', [PhotoController::class, 'download']);
+    Route::get('/photo/session/{session_uid}/download-all', [PhotoController::class, 'downloadAll']);
+
+});
+
 // Route khusus untuk sudah terautentikasi
 Route::middleware('auth:sanctum')->group(function () {
     // Acara
@@ -25,21 +44,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/frame/{uid}', [FrameController::class, 'show']);
     Route::delete('/frame/delete/{uid}', [FrameController::class, 'delete']);
     Route::post('/frame/update/{uid}', [FrameController::class, 'update']);
-
-    //Session
-    Route::post('/session/create', [SessionController::class, 'create']);
-    Route::get('/session/index', [SessionController::class, 'index']);
-    Route::get('/session/{uid}/check', [SessionController::class, 'checkActive']);
-    Route::delete('/session/delete/{uid}', [SessionController::class, 'delete']);
-
-    // Photo
-    Route::post('/photo/create', [PhotoController::class, 'create']);
-    Route::get('/photo/index', [PhotoController::class, 'index']);
-    Route::get('/photo/{uid}', [PhotoController::class, 'show']);
-    Route::post('/photo/{uid}/retake', [PhotoController::class, 'retake']);
-    Route::delete('/photo/delete/{uid}', [PhotoController::class, 'destroy']);
-    Route::delete('/photo/session/clear', [PhotoController::class, 'destroyBySession']);
-    Route::get('/photo/{uid}/download', [PhotoController::class, 'download']);
-    Route::get('/photo/session/{session_uid}/download-all', [PhotoController::class, 'downloadAllBySession']);
 
 });
