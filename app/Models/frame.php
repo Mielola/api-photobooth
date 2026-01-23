@@ -17,6 +17,7 @@ class frame extends Model
     protected $fillable = [
         'uid',
         'nama_frame',
+        'photo',
         'jumlah_foto',
         'acara_id',
         'created_at',

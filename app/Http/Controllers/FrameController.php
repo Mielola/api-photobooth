@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\acara;
 use App\Models\frame;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class FrameController extends Controller
 {
@@ -92,6 +93,11 @@ class FrameController extends Controller
                 'message' => 'Data Frame tidak ditemukan',
             ], 404);
         }
+        // Hapus file photo dari storage jika diperlukan
+        if ($frame->photo) {
+            Storage::disk('public')->delete($frame->photo);
+        }
+
         $frame->delete();
         return response()->json([
             'success' => true,
@@ -117,6 +123,10 @@ class FrameController extends Controller
             ]);
 
             if ($request->hasFile('photo')) {
+                // Hapus file photo lama dari storage jika ada
+                if ($frame->photo) {
+                    Storage::disk('public')->delete($frame->photo);
+                }
                 $validated['photo'] = $request->file('photo')->store('frames', 'public');
             }
 
@@ -124,13 +134,13 @@ class FrameController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Frame berhasil diperbarui',
+                'message' => 'Data Frame berhasil diperbarui',
                 'data'    => $frame,
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Frame gagal diperbarui',
+                'message' => 'Data Frame gagal diperbarui',
                 'error'   => $e->getMessage(),
             ], 500);
         }

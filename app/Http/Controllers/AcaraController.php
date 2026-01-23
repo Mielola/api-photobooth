@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\acara;
+use App\Models\frame;
+use App\Models\sessionPhoto;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -72,6 +74,14 @@ class AcaraController extends Controller
     public function show($uid)
     {
         $acara = acara::where('uid', $uid)->first();
+        $sessionPhoto = sessionPhoto::join('table_session', 'table_session_photo.session_id', '=', 'table_session.id')
+            ->where('table_session.acara_id', $acara->id)
+            ->select('table_session_photo.*')
+            ->get();
+        $frame = frame::where('acara_id', $acara->id)->get();
+        $acara->session_photos = $sessionPhoto;
+        $acara->frame = $frame;
+
         if (!$acara) {
             return response()->json(['message' => 'Acara not found'], 404);
         }
