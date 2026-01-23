@@ -13,7 +13,7 @@ use Carbon\Carbon;
 class SessionController extends Controller
 {
     /**
-     * Buat session
+     * Buat session tanpa email (client langsung mulai photobooth)
      */
     public function create(Request $request)
     {
@@ -24,6 +24,7 @@ class SessionController extends Controller
                 'acara_uid' => 'required|exists:table_acara,uid',
             ]);
 
+            // Cari acara berdasarkan UID
             $acara = acara::where('uid', $validatedData['acara_uid'])->first();
 
             if (!$acara) {
@@ -33,6 +34,7 @@ class SessionController extends Controller
                 ], 404);
             }
 
+            // Cek apakah acara aktif
             if (!$acara->status) {
                 return response()->json([
                     'success' => false,
@@ -40,15 +42,17 @@ class SessionController extends Controller
                 ], 403);
             }
 
-            $durasi = 10;
+            // Set durasi session (10 menit)
+            $durasi = 100;
             $expired_time = Carbon::now()->addMinutes($durasi);
 
             $session = session::create([
                 'acara_id' => $acara->id,
-                'email' => null,
+                'email' => null, // Email akan diisi nanti saat mau cetak
                 'expired_time' => $expired_time,
             ]);
 
+            // Load frames yang tersedia untuk acara ini
             $frames = frame::where('acara_id', $acara->id)->get();
 
             DB::commit();
@@ -95,7 +99,8 @@ class SessionController extends Controller
     }
 
     /**
-     * Update email
+     * Update email session (dipanggil saat user klik tombol cetak dan input email)
+     * Email hanya disimpan di database untuk data kontak, tidak dikirim email
      */
     public function updateEmail(Request $request, $uid)
     {
@@ -147,6 +152,42 @@ class SessionController extends Controller
     }
 
     /**
+     * Generate QR Code untuk download (setelah email diinput)
+     */
+    public function generateDownloadQR($uid)
+    {
+        $session = session::with('acara')->where('uid', $uid)->first();
+
+        if (!$session) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Session tidak ditemukan',
+            ], 404);
+        }
+
+        if (empty($session->email)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Email belum diinput, silakan input email terlebih dahulu',
+            ], 400);
+        }
+
+        // URL untuk download foto
+        $downloadUrl = url('/download/' . $session->uid);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'QR Code berhasil digenerate',
+            'data' => [
+                'session_uid' => $session->uid,
+                'email' => $session->email,
+                'download_url' => $downloadUrl,
+                'qr_data' => $downloadUrl, // Client akan generate QR code dari URL ini
+            ],
+        ], 200);
+    }
+
+    /**
      * Get detail session beserta frames yang tersedia
      */
     public function show($uid)
@@ -160,6 +201,7 @@ class SessionController extends Controller
             ], 404);
         }
 
+        // Cek status aktif session
         $now = Carbon::now();
         $expired = Carbon::parse($session->expired_time);
         $is_active = $now->lessThan($expired);
@@ -172,6 +214,7 @@ class SessionController extends Controller
             ], 403);
         }
 
+        // Load frames yang tersedia untuk acara ini
         $frames = frame::where('acara_id', $session->acara_id)->get();
 
         return response()->json([
@@ -234,6 +277,54 @@ class SessionController extends Controller
         ], 200);
     }
 
+    /**
+     * Perpanjang waktu session
+     */
+    public function extend($uid)
+    {
+        try {
+            DB::beginTransaction();
+
+            $session = session::where('uid', $uid)->first();
+
+            if (!$session) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Session tidak ditemukan',
+                ], 404);
+            }
+
+            // Perpanjang 10 menit lagi
+            $durasi = 10;
+            $expired_time = Carbon::now()->addMinutes($durasi);
+
+            $session->update([
+                'expired_time' => $expired_time,
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Session berhasil diperpanjang',
+                'data' => [
+                    'expired_time' => $expired_time->format('Y-m-d H:i:s'),
+                    'waktu_tersisa_menit' => $durasi,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memperpanjang session',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * List semua session (untuk admin)
+     */
     public function index(Request $request)
     {
         $perPage = $request->query('per_page', 10);
@@ -241,6 +332,7 @@ class SessionController extends Controller
 
         $sessions = $query->orderByDesc('created_at')->paginate($perPage);
 
+        // Tambahkan informasi status aktif pada setiap session
         $sessions->getCollection()->transform(function ($session) {
             $now = Carbon::now();
             $expired = Carbon::parse($session->expired_time);
@@ -261,6 +353,9 @@ class SessionController extends Controller
         ], 200);
     }
 
+    /**
+     * Update session (untuk admin)
+     */
     public function update(Request $request, $uid)
     {
         try {
@@ -306,6 +401,9 @@ class SessionController extends Controller
         }
     }
 
+    /**
+     * Hapus session (untuk admin)
+     */
     public function delete($uid)
     {
         $session = session::where('uid', $uid)->first();

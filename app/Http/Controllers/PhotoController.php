@@ -24,7 +24,7 @@ class PhotoController extends Controller
         try {
             $validatedData = $request->validate([
                 'session_uid' => 'required|string',
-                'photo' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+                'photo' => 'required|image|mimes:jpeg,png,jpg|max:5120',
             ]);
 
             // Cari session dan validasi

@@ -17,8 +17,25 @@ class session extends Model
     protected $fillable = [
         'uid',
         'acara_id',
+        'email',
         'expired_time',
         'created_at',
         'updated_at',
     ];
+
+    /**
+     * Relasi ke tabel acara
+     */
+    public function acara()
+    {
+        return $this->belongsTo(acara::class, 'acara_id');
+    }
+
+    /**
+     * Relasi ke tabel session_photo
+     */
+    public function photos()
+    {
+        return $this->hasMany(sessionPhoto::class, 'session_id');
+    }
 }

@@ -14,8 +14,9 @@ return new class extends Migration
         Schema::create('table_session', function (Blueprint $table) {
             $table->id();
             $table->ulid('uid')->unique();
-            $table->timestamp('expired_time');
             $table->foreignId('acara_id')->constrained('table_acara')->onDelete('cascade');
+            $table->string('email', 255)->nullable();
+            $table->timestamp('expired_time');
             $table->timestamps();
         });
     }
