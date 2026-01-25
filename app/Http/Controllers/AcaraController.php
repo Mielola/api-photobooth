@@ -17,10 +17,10 @@ class AcaraController extends Controller
 
         try {
             $validatedData = $request->validate([
-                'nama_acara'     => 'required|string|max:255',
-                'nama_pengantin'     => 'required|string|max:255',
-                'tanggal'  => 'required|date',
-                'background'     => 'required|image|mimes:jpg,jpeg,png,webp|max:2048',
+                'nama_acara' => 'required|string|max:255',
+                'nama_pengantin' => 'required|string|max:255',
+                'tanggal' => 'required|date',
+                'background' => 'required|image|mimes:jpg,jpeg,png,webp|max:2048',
             ]);
 
             // Format tanggal ke 2000-01-01
@@ -39,7 +39,7 @@ class AcaraController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Acara berhasil dibuat',
-                'data'    => $acara,
+                'data' => $acara,
             ], 201);
         } catch (ValidationException $e) {
             return response()->json([
@@ -53,7 +53,7 @@ class AcaraController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Acara gagal dibuat',
-                'error'   => $e->getMessage(),
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -67,7 +67,7 @@ class AcaraController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Data Acara berhasil ditemukan',
-            'data'    => $acaras,
+            'data' => $acaras,
         ], 200);
     }
 
@@ -88,7 +88,7 @@ class AcaraController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Data Acara berhasil ditemukan',
-            'data'    => $acara,
+            'data' => $acara,
         ], 200);
     }
 
@@ -136,4 +136,35 @@ class AcaraController extends Controller
             return response()->json(['message' => 'Update failed', 'error' => $e->getMessage()], 500);
         }
     }
+
+    public function getActive()
+    {
+        try {
+            $acaras = acara::where('status', true)
+                ->orderByDesc('tanggal')
+                ->get();
+
+            // Add full URL for background images
+            $acaras->transform(function ($acara) {
+                if ($acara->background) {
+                    $acara->background_url = asset('storage/' . $acara->background);
+                }
+                return $acara;
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data Acara aktif berhasil ditemukan',
+                'data' => $acaras,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data acara',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
 }
+

@@ -11,6 +11,11 @@ use Illuminate\Support\Facades\Route;
 Route::post('/login', [AuthController::class, 'login']);
 
 Route::prefix('client')->group(function () {
+    // Public access untuk client photobooth
+    Route::get('/acara/active', [AcaraController::class, 'getActive']);
+    Route::get('/acara/{uid}', [AcaraController::class, 'show']);
+    Route::get('/frame/by-acara/{acara_uid}', [FrameController::class, 'getByAcara']);
+
     // Session
     Route::post('/session/create', [SessionController::class, 'create']);
     Route::get('/session/{uid}', [SessionController::class, 'show']);
@@ -26,7 +31,6 @@ Route::prefix('client')->group(function () {
     Route::delete('/photo/{uid}', [PhotoController::class, 'delete']);
     Route::get('/photo/{uid}/download', [PhotoController::class, 'download']);
     Route::get('/photo/session/{session_uid}/download-all', [PhotoController::class, 'downloadAll']);
-
 });
 
 // Route khusus untuk sudah terautentikasi
@@ -36,7 +40,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/acara/delete/{uid}', [AcaraController::class, 'delete']);
     Route::post('/acara/update/{uid}', [AcaraController::class, 'update']);
     Route::get('/acara/index', [AcaraController::class, 'index']);
-    Route::get('/acara/{uid}', [AcaraController::class, 'show']);
 
     // Frame
     Route::post('/frame/create', [FrameController::class, 'create']);
@@ -44,5 +47,4 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/frame/{uid}', [FrameController::class, 'show']);
     Route::delete('/frame/delete/{uid}', [FrameController::class, 'delete']);
     Route::post('/frame/update/{uid}', [FrameController::class, 'update']);
-
 });

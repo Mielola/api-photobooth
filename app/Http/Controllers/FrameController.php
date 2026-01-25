@@ -44,13 +44,13 @@ class FrameController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Frame berhasil dibuat',
-                'data'    => $frame,
+                'data' => $frame,
             ], 201);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Frame gagal dibuat',
-                'error'   => $e->getMessage(),
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -64,7 +64,7 @@ class FrameController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Data Frame berhasil ditemukan',
-            'data'    => $frames,
+            'data' => $frames,
         ], 200);
     }
 
@@ -80,7 +80,7 @@ class FrameController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Data Frame berhasil ditemukan',
-            'data'    => $frame,
+            'data' => $frame,
         ], 200);
     }
 
@@ -135,12 +135,50 @@ class FrameController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Data Frame berhasil diperbarui',
-                'data'    => $frame,
+                'data' => $frame,
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Data Frame gagal diperbarui',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getByAcara($acara_uid)
+    {
+        try {
+            $acara = acara::where('uid', $acara_uid)->first();
+
+            if (!$acara) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Data Acara tidak ditemukan',
+                ], 404);
+            }
+
+            $frames = frame::where('acara_id', $acara->id)
+                ->orderBy('nama_frame')
+                ->get();
+
+            // Add full URL for frame images
+            $frames->transform(function ($frame) {
+                if ($frame->photo) {
+                    $frame->photo_url = url('storage/' . $frame->photo);
+                }
+                return $frame;
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data Frame berhasil ditemukan',
+                'data'    => $frames,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data frame',
                 'error'   => $e->getMessage(),
             ], 500);
         }
