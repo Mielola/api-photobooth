@@ -7,7 +7,6 @@ use App\Http\Controllers\SessionController;
 use App\Http\Controllers\PhotoController;
 use Illuminate\Support\Facades\Route;
 
-// Group API routes related to authentication
 Route::post('/login', [AuthController::class, 'login']);
 
 Route::prefix('client')->group(function () {
@@ -40,6 +39,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/acara/delete/{uid}', [AcaraController::class, 'delete']);
     Route::post('/acara/update/{uid}', [AcaraController::class, 'update']);
     Route::get('/acara/index', [AcaraController::class, 'index']);
+    Route::get('/acara/{uid}', [AcaraController::class, 'show']);
 
     // Frame
     Route::post('/frame/create', [FrameController::class, 'create']);

@@ -42,13 +42,13 @@ class SessionController extends Controller
                 ], 403);
             }
 
-            // Set durasi session (10 menit)
-            $durasi = 100;
+            // Set durasi session (10 menit) - PERBAIKI INI
+            $durasi = 10; // 10 menit, bukan 100
             $expired_time = Carbon::now()->addMinutes($durasi);
 
             $session = session::create([
                 'acara_id' => $acara->id,
-                'email' => null, // Email akan diisi nanti saat mau cetak
+                'email' => null,
                 'expired_time' => $expired_time,
             ]);
 
@@ -69,7 +69,7 @@ class SessionController extends Controller
                         'tanggal' => $acara->tanggal,
                         'background' => $acara->background ? asset('storage/' . $acara->background) : null,
                     ],
-                    'frames' => $frames->map(function($frame) {
+                    'frames' => $frames->map(function ($frame) {
                         return [
                             'uid' => $frame->uid,
                             'nama_frame' => $frame->nama_frame,
@@ -77,7 +77,8 @@ class SessionController extends Controller
                             'photo' => $frame->photo ? asset('storage/' . $frame->photo) : null,
                         ];
                     }),
-                    'expired_time' => $expired_time->format('Y-m-d H:i:s'),
+                    'expired_time' => $expired_time->toIso8601String(), // ISO format
+                    'expired_timestamp' => $expired_time->timestamp * 1000, // Timestamp in milliseconds
                     'waktu_tersisa_menit' => $durasi,
                 ],
             ], 201);
@@ -231,7 +232,7 @@ class SessionController extends Controller
                     'tanggal' => $session->acara->tanggal,
                     'background' => $session->acara->background ? asset('storage/' . $session->acara->background) : null,
                 ],
-                'frames' => $frames->map(function($frame) {
+                'frames' => $frames->map(function ($frame) {
                     return [
                         'uid' => $frame->uid,
                         'nama_frame' => $frame->nama_frame,
