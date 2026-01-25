@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Route;
 
 // Group API routes related to authentication
 Route::post('/login', [AuthController::class, 'login']);
+Route::get('/acara/{uid}/reprint', [AcaraController::class, 'reprintLastSession']);
 
 Route::prefix('client')->group(function () {
     // Public access untuk client photobooth
@@ -40,6 +41,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/acara/delete/{uid}', [AcaraController::class, 'delete']);
     Route::post('/acara/update/{uid}', [AcaraController::class, 'update']);
     Route::get('/acara/index', [AcaraController::class, 'index']);
+    Route::get('/acara/{uid}', [AcaraController::class, 'show']);
+    Route::post('/acara/status/update/{uid}', [AcaraController::class, 'setStatusEvent']);
 
     // Frame
     Route::post('/frame/create', [FrameController::class, 'create']);

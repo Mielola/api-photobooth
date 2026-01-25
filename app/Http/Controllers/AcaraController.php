@@ -73,11 +73,24 @@ class AcaraController extends Controller
 
     public function show($uid)
     {
-        $acara = acara::where('uid', $uid)->first();
+        $acara = acara::where('uid', $uid)->get()
+            ->map(function ($acara) {
+                if ($acara->background) {
+                    $acara->background_url = asset('storage/' . $acara->background);
+                    $acara->background = NULL;
+                }
+                return $acara;
+            })
+            ->first();
         $sessionPhoto = sessionPhoto::join('table_session', 'table_session_photo.session_id', '=', 'table_session.id')
             ->where('table_session.acara_id', $acara->id)
             ->select('table_session_photo.*')
-            ->get();
+            ->orderByDesc('table_session_photo.created_at')
+            ->get()
+            ->map(function ($photo) {
+                $photo->photo_url = asset('storage/' . $photo->photo_path);
+                return $photo;
+            });
         $frame = frame::where('acara_id', $acara->id)->get();
         $acara->session_photos = $sessionPhoto;
         $acara->frame = $frame;
@@ -166,5 +179,68 @@ class AcaraController extends Controller
         }
     }
 
-}
+    public function setStatusEvent($uid)
+    {
+        try {
+            $acara = acara::where('uid', $uid)->first();
+            if (!$acara) {
+                return response()->json(['message' => 'Acara not found'], 404);
+            }
+            $acara->status = !$acara->status;
+            $acara->save();
 
+            return response()->json([
+                'success' => true,
+                'message' => 'Status acara berhasil diubah',
+                'data' => $acara->status,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengubah status acara',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function reprintLastSession($acaraUid)
+    {
+        $acara = Acara::where('uid', $acaraUid)->firstOrFail();
+
+        $photos = SessionPhoto::join('table_session', 'table_session_photo.session_id', '=', 'table_session.id')
+            ->where('table_session.acara_id', $acara->id)
+            ->orderBy('table_session_photo.created_at', 'desc')
+            ->get();
+
+        if ($photos->isEmpty()) {
+            abort(404, 'Tidak ada foto');
+        }
+
+        $lastSessionId = $photos->first()->session_id;
+        $photos = $photos->where('session_id', $lastSessionId);
+
+        // 🔹 TEMP folder (bukan public)
+        $tempDir = storage_path('app/temp');
+        if (!file_exists($tempDir)) {
+            mkdir($tempDir, 0755, true);
+        }
+
+        $zipName = 'reprint-' . $acara->uid . '-' . time() . '.zip';
+        $zipPath = $tempDir . '/' . $zipName;
+
+        $zip = new \ZipArchive();
+        $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+
+        foreach ($photos as $i => $photo) {
+            $zip->addFile(
+                storage_path('app/public/' . $photo->photo_path),
+                'foto-' . ($i + 1) . '.jpg'
+            );
+        }
+
+        $zip->close();
+
+        // 🔥 AUTO DELETE setelah dikirim
+        return response()->download($zipPath)->deleteFileAfterSend(true);
+    }
+}
