@@ -473,4 +473,142 @@ class PhotoController extends Controller
             ], 500);
         }
     }
+
+    public function uploadWithEmail(Request $request)
+    {
+        DB::beginTransaction();
+
+        try {
+            // Debug log untuk melihat request
+            \Log::info('Upload with email request', [
+                'all_data' => $request->all(),
+                'files' => $request->allFiles(),
+            ]);
+
+            $validatedData = $request->validate([
+                'session_uid' => 'required|string',
+                'email' => 'required|email|max:255',
+                'frame_uid' => 'required|string',
+                'print_count' => 'required|integer|min:1|max:3',
+                'photos' => 'required|array|min:1|max:3',
+                'photos.*' => 'required|image|mimes:jpeg,png,jpg|max:10240',
+                'scales' => 'nullable|array',
+                'scales.*' => 'nullable|numeric|min:0.5|max:2',
+            ]);
+
+            // Validasi session
+            $session = session::where('uid', $validatedData['session_uid'])
+                ->with('acara')
+                ->first();
+
+            if (!$session) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Session tidak ditemukan',
+                ], 404);
+            }
+
+            // Cek session aktif
+            $now = Carbon::now();
+            $expired = Carbon::parse($session->expired_time);
+            if ($now->greaterThanOrEqualTo($expired)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Session sudah kadaluarsa',
+                ], 403);
+            }
+
+            // Validasi frame
+            $frame = frame::where('uid', $validatedData['frame_uid'])->first();
+
+            if (!$frame) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Frame tidak ditemukan',
+                ], 404);
+            }
+
+            // 1. Update email di session
+            $session->update([
+                'email' => $validatedData['email']
+            ]);
+
+            // 2. Setup folder path
+            $namaPengantin = Str::slug($session->acara->nama_pengantin, '_');
+            $folderPath = 'photos/' . $namaPengantin . '/' . $session->uid;
+
+            // 3. Upload semua foto
+            $uploadedPhotos = [];
+            $photos = $request->file('photos');
+            $scales = $validatedData['scales'] ?? [];
+
+            foreach ($photos as $index => $photo) {
+                $filename = 'framed_' . time() . '_' . $index . '_' . uniqid() . '.' . $photo->getClientOriginalExtension();
+                $path = $photo->storeAs($folderPath, $filename, 'public');
+
+                $sessionPhoto = sessionPhoto::create([
+                    'type' => 'framed',
+                    'photo_path' => $path,
+                    'session_id' => $session->id,
+                ]);
+
+                $uploadedPhotos[] = [
+                    'uid' => $sessionPhoto->uid,
+                    'type' => $sessionPhoto->type,
+                    'url' => asset('storage/' . $path),
+                    'scale' => $scales[$index] ?? 1,
+                ];
+            }
+
+            DB::commit();
+
+            // Log untuk print command
+            \Log::info('Print command', [
+                'session_uid' => $validatedData['session_uid'],
+                'email' => $validatedData['email'],
+                'print_count' => $validatedData['print_count'],
+                'photos_count' => count($uploadedPhotos),
+                'frame' => $frame->nama_frame,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Email tersimpan dan foto berhasil diupload',
+                'data' => [
+                    'session_uid' => $session->uid,
+                    'email' => $session->email,
+                    'print_count' => $validatedData['print_count'],
+                    'frame' => [
+                        'uid' => $frame->uid,
+                        'nama_frame' => $frame->nama_frame,
+                    ],
+                    'photos' => $uploadedPhotos,
+                    'total_photos' => count($uploadedPhotos),
+                ],
+            ], 201);
+
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            \Log::error('Validation error', [
+                'errors' => $e->errors(),
+                'request' => $request->all(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Upload error', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memproses request',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }

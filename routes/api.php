@@ -31,6 +31,7 @@ Route::prefix('client')->group(function () {
     Route::delete('/photo/{uid}', [PhotoController::class, 'delete']);
     Route::get('/photo/{uid}/download', [PhotoController::class, 'download']);
     Route::get('/photo/session/{session_uid}/download-all', [PhotoController::class, 'downloadAll']);
+    Route::post('/photo/upload-with-email', [PhotoController::class, 'uploadWithEmail']);
 });
 
 // Route khusus untuk sudah terautentikasi

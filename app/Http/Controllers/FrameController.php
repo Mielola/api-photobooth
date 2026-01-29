@@ -173,13 +173,13 @@ class FrameController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Data Frame berhasil ditemukan',
-                'data'    => $frames,
+                'data' => $frames,
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal mengambil data frame',
-                'error'   => $e->getMessage(),
+                'error' => $e->getMessage(),
             ], 500);
         }
     }

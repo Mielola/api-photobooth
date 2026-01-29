@@ -251,7 +251,8 @@ class SessionController extends Controller
      * Cek status aktif session
      */
     public function checkActive($uid)
-    {
+{
+    try {
         $session = session::where('uid', $uid)->first();
 
         if (!$session) {
@@ -262,21 +263,43 @@ class SessionController extends Controller
         }
 
         $now = Carbon::now();
-        $expired = Carbon::parse($session->expired_time);
-        $is_active = $now->lessThan($expired);
-        $waktu_tersisa = $is_active ? $now->diffInMinutes($expired) : 0;
+        $expiredTime = Carbon::parse($session->expired_time);
+
+        // Cek apakah session expired atau sudah direset
+        // Jika expired_time < sekarang, berarti sudah tidak aktif
+        $isActive = $expiredTime->greaterThan($now);
+
+        // Cek juga apakah expired_time adalah tahun 1999 (direset manual)
+        $isReset = $expiredTime->year === 1999;
+
+        if ($isReset) {
+            $message = 'Session telah direset oleh admin';
+        } elseif (!$isActive) {
+            $message = 'Session telah expired';
+        } else {
+            $message = 'Session masih aktif';
+        }
 
         return response()->json([
             'success' => true,
-            'message' => $is_active ? 'Session masih aktif' : 'Session sudah kadaluarsa',
+            'message' => $message,
             'data' => [
-                'is_active' => $is_active,
-                'waktu_tersisa_menit' => $waktu_tersisa,
-                'waktu_tersisa_detik' => $is_active ? $now->diffInSeconds($expired) : 0,
-                'expired_time' => $session->expired_time,
+                'session_uid' => $session->uid,
+                'is_active' => $isActive && !$isReset,
+                'is_reset' => $isReset,
+                'expired_time' => $expiredTime->toIso8601String(),
+                'expired_timestamp' => $expiredTime->timestamp * 1000,
+                'remaining_seconds' => $isActive ? $now->diffInSeconds($expiredTime) : 0,
             ],
         ], 200);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Gagal memeriksa status session',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
 
     /**
      * Perpanjang waktu session
