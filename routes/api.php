@@ -41,6 +41,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/acara/update/{uid}', [AcaraController::class, 'update']);
     Route::get('/acara/index', [AcaraController::class, 'index']);
     Route::get('/acara/{uid}', [AcaraController::class, 'show']);
+    Route::post('/acara/reset/{uid}', [AcaraController::class, 'resetSession']);
     Route::post('/acara/status/update/{uid}', [AcaraController::class, 'setStatusEvent']);
 
     // Frame

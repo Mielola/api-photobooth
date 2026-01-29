@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\acara;
 use App\Models\frame;
 use App\Models\sessionPhoto;
+use App\Models\session;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -62,60 +63,108 @@ class AcaraController extends Controller
     {
         $perPage = $request->query('per_page', 10);
         $query = acara::query();
+        $search = $request->query('search');
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('nama_acara', 'like', '%' . $search . '%')
+                    ->orWhere('nama_pengantin', 'like', '%' . $search . '%');
+            });
+        }
 
         $acaras = $query->orderByDesc('created_at')->paginate($perPage);
-        return response()->json([
-            'success' => true,
-            'message' => 'Data Acara berhasil ditemukan',
-            'data' => $acaras,
-        ], 200);
-    }
 
-    public function show($uid)
-    {
-        $acara = acara::where('uid', $uid)->get()
-            ->map(function ($acara) {
-                if ($acara->background) {
-                    $acara->background_url = asset('storage/' . $acara->background);
-                    $acara->background = NULL;
-                }
-                return $acara;
-            })
-            ->first();
+        // Ambil 1 foto terakhir per acara
+        $acaraIds = $acaras->pluck('id');
         $sessionPhoto = sessionPhoto::join('table_session', 'table_session_photo.session_id', '=', 'table_session.id')
-            ->where('table_session.acara_id', $acara->id)
-            ->select('table_session_photo.*')
-            ->orderByDesc('table_session_photo.created_at')
+            ->join('table_acara', 'table_session.acara_id', '=', 'table_acara.id')
+            ->whereIn('table_session.acara_id', $acaraIds)
+            ->select('table_session_photo.*', 'table_session.acara_id', 'table_acara.uid as acara_uid')
+            ->whereIn('table_session_photo.id', function ($query) use ($acaraIds) {
+                $query->select(DB::raw('MAX(table_session_photo.id)'))
+                    ->from('table_session_photo')
+                    ->join('table_session', 'table_session_photo.session_id', '=', 'table_session.id')
+                    ->whereIn('table_session.acara_id', $acaraIds)
+                    ->groupBy('table_session.acara_id');
+            })
             ->get()
             ->map(function ($photo) {
                 $photo->photo_url = asset('storage/' . $photo->photo_path);
                 return $photo;
             });
-        $frame = frame::where('acara_id', $acara->id)->get();
-        $acara->session_photos = $sessionPhoto;
-        $acara->frame = $frame;
 
-        if (!$acara) {
-            return response()->json(['message' => 'Acara not found'], 404);
-        }
         return response()->json([
             'success' => true,
             'message' => 'Data Acara berhasil ditemukan',
-            'data' => $acara,
+            'data' => $acaras,
+            'session_photos' => $sessionPhoto,
         ], 200);
+    }
+
+    public function show($uid)
+    {
+        try {
+            $acara = acara::where('uid', $uid)->get()
+                ->map(function ($acara) {
+                    if ($acara->background) {
+                        $acara->background_url = asset('storage/' . $acara->background);
+                        $acara->background = NULL;
+                    }
+                    return $acara;
+                })
+                ->first();
+            $sessionPhoto = sessionPhoto::join('table_session', 'table_session_photo.session_id', '=', 'table_session.id')
+                ->where('table_session.acara_id', $acara->id)
+                ->select('table_session_photo.*')
+                ->orderByDesc('table_session_photo.created_at')
+                ->get()
+                ->map(function ($photo) {
+                    $photo->photo_url = asset('storage/' . $photo->photo_path);
+                    return $photo;
+                });
+            $acara->session_photos = $sessionPhoto;
+            $frame = frame::where('acara_id', $acara->id)->get();
+            $acara->frame = $frame;
+
+            if (!$acara) {
+                return response()->json(['message' => 'Acara not found'], 404);
+            }
+            return response()->json([
+                'success' => true,
+                'message' => 'Data Acara berhasil ditemukan',
+                'data' => $acara,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data acara',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function delete($uid)
     {
-        $acara = acara::where('uid', $uid)->first();
-        if (!$acara) {
-            return response()->json(['message' => 'Acara not found'], 404);
+        DB::beginTransaction();
+        try {
+            $acara = acara::where('uid', $uid)->first();
+            if (!$acara) {
+                return response()->json(['message' => 'Acara not found'], 404);
+            }
+            $acara->delete();
+            DB::commit();
+            return response()->json([
+                'success' => true,
+                'message' => 'Data Acara berhasil dihapus',
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghapus acara',
+                'error' => $e->getMessage(),
+            ], 500);
         }
-        $acara->delete();
-        return response()->json([
-            'success' => true,
-            'message' => 'Data Acara berhasil dihapus',
-        ], 200);
     }
 
     public function update(Request $request, $uid)
@@ -239,8 +288,59 @@ class AcaraController extends Controller
         }
 
         $zip->close();
-
-        // 🔥 AUTO DELETE setelah dikirim
         return response()->download($zipPath)->deleteFileAfterSend(true);
+    }
+
+    public function resetSession($acaraUid)
+    {
+        DB::beginTransaction();
+        try {
+            $session = session::join(
+                'table_acara',
+                'table_session.acara_id',
+                '=',
+                'table_acara.id'
+            )
+                ->where('table_acara.uid', $acaraUid)
+                ->select('table_session.*')
+                ->orderByDesc('table_session.created_at')
+                ->first();
+
+            if (!$session) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Sesi tidak ditemukan untuk acara ini.',
+                ], 404);
+            }
+
+            if (!$session->expired_time || $session->expired_time < now()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Sesi terakhir sudah direset',
+                ], 400);
+            }
+
+            // Expire paksa
+            $session->expired_time = '1999-01-01 00:00:00';
+            $session->save();
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Sesi berhasil direset.',
+                'data' => [
+                    'session_uid' => $session->uid,
+                    'session_id' => $session->id,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mereset sesi.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 }
