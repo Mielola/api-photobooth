@@ -586,7 +586,6 @@ class PhotoController extends Controller
                     'total_photos' => count($uploadedPhotos),
                 ],
             ], 201);
-
         } catch (ValidationException $e) {
             DB::rollBack();
             \Log::error('Validation error', [
@@ -608,6 +607,75 @@ class PhotoController extends Controller
                 'success' => false,
                 'message' => 'Gagal memproses request',
                 'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function sendPhoto(Request $request)
+    {
+        try {
+            DB::beginTransaction();
+
+            $request->validate([
+                'raw_photos'      => 'required|array|min:1|max:3',
+                'raw_photos.*'    => 'required|image|mimes:png|max:2048',
+                'frame_photo'     => 'required|image|mimes:png|max:2048',
+                'email'           => 'required|email',
+                'session_uid'     => 'required|string|exists:table_session,uid',
+            ]);
+
+            // Ambil session
+            $session = Session::where('uid', $request->session_uid)->firstOrFail();
+
+            // Update email pada session
+            $session->update([
+                'email' => $request->email,
+            ]);
+
+            $photosToInsert = [];
+
+            // Simpan RAW photos
+            foreach ($request->raw_photos as $rawPhoto) {
+                $rawPhotoPath = $rawPhoto->store('photos/original', 'public');
+
+                $photosToInsert[] = [
+                    'uid'        => (string) Str::ulid(),
+                    'session_id' => $session->id,
+                    'photo_path' => $rawPhotoPath,
+                    'type'       => 'raw',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+
+            // Simpan FRAMED photo
+            $framedPhotoPath = $request->frame_photo->store('photos/framed', 'public');
+
+            $photosToInsert[] = [
+                'uid'        => (string) Str::ulid(),
+                'session_id' => $session->id,
+                'photo_path' => $framedPhotoPath,
+                'type'       => 'framed',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+
+            // Insert massal
+            SessionPhoto::insert($photosToInsert);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Foto berhasil disimpan dan email diperbarui',
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengirim dan menyimpan foto',
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }
