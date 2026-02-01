@@ -32,4 +32,8 @@ class frame extends Model
             ? Storage::disk('public')->url($this->photo)
             : null;
     }
+    public function acara()
+    {
+        return $this->belongsTo(Acara::class, 'acara_id');
+    }
 }
