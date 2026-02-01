@@ -49,9 +49,9 @@ class PhotoController extends Controller
                 ], 403);
             }
 
-            // Buat folder berdasarkan nama pengantin dan session
-            $namaPengantin = Str::slug($session->acara->nama_pengantin, '_');
-            $folderPath = 'photos/' . $namaPengantin . '/' . $session->uid;
+            // Buat folder berdasarkan struktur: Acara/{namaAcara}-{uid}/photos/{uidSession}
+            $slugNamaAcara = Str::slug($session->acara->nama_acara);
+            $folderPath = "Acara/{$slugNamaAcara}-{$session->acara->uid}/photos/{$session->uid}";
 
             // Upload foto
             $file = $request->file('photo');
@@ -138,9 +138,9 @@ class PhotoController extends Controller
                 ], 403);
             }
 
-            // Upload foto hasil dengan frame
-            $namaPengantin = Str::slug($session->acara->nama_pengantin, '_');
-            $folderPath = 'photos/' . $namaPengantin . '/' . $session->uid;
+            // Upload foto hasil dengan frame - struktur: Acara/{namaAcara}-{uid}/photos/{uidSession}
+            $slugNamaAcara = Str::slug($session->acara->nama_acara);
+            $folderPath = "Acara/{$slugNamaAcara}-{$session->acara->uid}/photos/{$session->uid}";
 
             $file = $request->file('photo');
             $filename = 'framed_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
@@ -183,7 +183,6 @@ class PhotoController extends Controller
             ], 500);
         }
     }
-
     /**
      * Get semua foto dalam satu session
      */
@@ -299,8 +298,8 @@ class PhotoController extends Controller
             }
 
             // Upload foto baru
-            $namaPengantin = Str::slug($session->acara->nama_pengantin, '_');
-            $folderPath = 'photos/' . $namaPengantin . '/' . $session->uid;
+            $slugNamaAcara = Str::slug($session->acara->nama_acara);
+            $folderPath = "Acara/{$slugNamaAcara}-{$session->acara->uid}/photos/{$session->uid}";
 
             $file = $request->file('photo');
             $filename = $oldPhoto->type . '_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
@@ -617,45 +616,53 @@ class PhotoController extends Controller
             DB::beginTransaction();
 
             $request->validate([
-                'raw_photos'      => 'required|array|min:1|max:3',
-                'raw_photos.*'    => 'required|image|mimes:png|max:2048',
-                'frame_photo'     => 'required|image|mimes:png|max:2048',
-                'email'           => 'required|email',
-                'session_uid'     => 'required|string|exists:table_session,uid',
+                'raw_photos' => 'required|array|min:1|max:3',
+                'raw_photos.*' => 'required|image|mimes:png|max:2048',
+                'frame_photo' => 'required|image|mimes:png|max:2048',
+                'email' => 'required|email',
+                'session_uid' => 'required|string|exists:table_session,uid',
             ]);
 
-            // Ambil session
-            $session = Session::where('uid', $request->session_uid)->firstOrFail();
+            // Ambil session dengan acara
+            $session = Session::where('uid', $request->session_uid)
+                ->with('acara')
+                ->firstOrFail();
 
             // Update email pada session
             $session->update([
                 'email' => $request->email,
             ]);
 
+            // Buat path folder sesuai struktur: Acara/{namaAcara}-{uid}/photos/{uidSession}
+            $slugNamaAcara = Str::slug($session->acara->nama_acara);
+            $folderPath = "Acara/{$slugNamaAcara}-{$session->acara->uid}/photos/{$session->uid}";
+
             $photosToInsert = [];
 
             // Simpan RAW photos
-            foreach ($request->raw_photos as $rawPhoto) {
-                $rawPhotoPath = $rawPhoto->store('photos/original', 'public');
+            foreach ($request->raw_photos as $index => $rawPhoto) {
+                $filename = 'raw_' . time() . '_' . ($index + 1) . '_' . uniqid() . '.png';
+                $rawPhotoPath = $rawPhoto->storeAs($folderPath, $filename, 'public');
 
                 $photosToInsert[] = [
-                    'uid'        => (string) Str::ulid(),
+                    'uid' => (string) Str::ulid(),
                     'session_id' => $session->id,
                     'photo_path' => $rawPhotoPath,
-                    'type'       => 'raw',
+                    'type' => 'raw',
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];
             }
 
             // Simpan FRAMED photo
-            $framedPhotoPath = $request->frame_photo->store('photos/framed', 'public');
+            $framedFilename = 'framed_' . time() . '_' . uniqid() . '.png';
+            $framedPhotoPath = $request->frame_photo->storeAs($folderPath, $framedFilename, 'public');
 
             $photosToInsert[] = [
-                'uid'        => (string) Str::ulid(),
+                'uid' => (string) Str::ulid(),
                 'session_id' => $session->id,
                 'photo_path' => $framedPhotoPath,
-                'type'       => 'framed',
+                'type' => 'framed',
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
@@ -675,7 +682,7 @@ class PhotoController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal mengirim dan menyimpan foto',
-                'error'   => $e->getMessage(),
+                'error' => $e->getMessage(),
             ], 500);
         }
     }

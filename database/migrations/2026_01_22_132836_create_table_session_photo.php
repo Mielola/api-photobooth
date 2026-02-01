@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->ulid('uid')->unique();
             $table->string('type', 16);
-            $table->string('photo_path', 100);
+            $table->string('photo_path', 255);
             $table->foreignId('session_id')->constrained('table_session')->onDelete('cascade');
             $table->timestamps();
         });
