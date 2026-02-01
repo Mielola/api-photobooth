@@ -6,13 +6,13 @@ use App\Models\acara;
 use App\Models\frame;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class FrameController extends Controller
 {
     //
     public function create(Request $request)
     {
-        //
         try {
             $validated = $request->validate([
                 'nama_frame' => 'required|string|max:100',
@@ -21,12 +21,13 @@ class FrameController extends Controller
                 'acara_uid' => 'required|exists:table_acara,uid',
             ]);
 
-            if ($request->hasFile('photo')) {
-                $validated['photo'] = $request->file('photo')->store('frames', 'public');
-            }
+            /**
+             * ===============================
+             * AMBIL DATA ACARA
+             * ===============================
+             */
+            $acara = Acara::where('uid', $validated['acara_uid'])->first();
 
-            // Cek apakah acara dengan uid tersebut ada
-            $acara = acara::where('uid', $validated['acara_uid'])->first();
             if (!$acara) {
                 return response()->json([
                     'success' => false,
@@ -34,7 +35,32 @@ class FrameController extends Controller
                 ], 404);
             }
 
-            $frame = frame::create([
+            /**
+             * ===============================
+             * TENTUKAN PATH FOLDER FRAME
+             * ===============================
+             */
+            $slugNamaAcara = Str::slug($acara->nama_acara);
+            $framePath = "Acara/{$slugNamaAcara}-{$acara->uid}/Frame";
+
+            /**
+             * ===============================
+             * UPLOAD FOTO FRAME
+             * ===============================
+             */
+            if ($request->hasFile('photo')) {
+                $validated['photo'] = $request->file('photo')->store(
+                    $framePath,
+                    'public'
+                );
+            }
+
+            /**
+             * ===============================
+             * SIMPAN KE DB
+             * ===============================
+             */
+            $frame = Frame::create([
                 'nama_frame' => $validated['nama_frame'],
                 'jumlah_foto' => $validated['jumlah_foto'],
                 'photo' => $validated['photo'],
@@ -86,19 +112,31 @@ class FrameController extends Controller
 
     public function delete($uid)
     {
-        $frame = frame::where('uid', $uid)->first();
+        $frame = Frame::with('acara')->where('uid', $uid)->first();
+
         if (!$frame) {
             return response()->json([
                 'success' => false,
                 'message' => 'Data Frame tidak ditemukan',
             ], 404);
         }
-        // Hapus file photo dari storage jika diperlukan
-        if ($frame->photo) {
+
+        /**
+         * ===============================
+         * HAPUS FILE FRAME
+         * ===============================
+         */
+        if ($frame->photo && Storage::disk('public')->exists($frame->photo)) {
             Storage::disk('public')->delete($frame->photo);
         }
 
+        /**
+         * ===============================
+         * HAPUS DATA DB
+         * ===============================
+         */
         $frame->delete();
+
         return response()->json([
             'success' => true,
             'message' => 'Data Frame berhasil dihapus',
@@ -108,7 +146,8 @@ class FrameController extends Controller
     public function update(Request $request, $uid)
     {
         try {
-            $frame = frame::where('uid', $uid)->first();
+            $frame = Frame::with('acara')->where('uid', $uid)->first();
+
             if (!$frame) {
                 return response()->json([
                     'success' => false,
@@ -119,17 +158,37 @@ class FrameController extends Controller
             $validated = $request->validate([
                 'nama_frame' => 'sometimes|required|string|max:100',
                 'jumlah_foto' => 'sometimes|required|integer|min:1|max:10',
-                'photo' => 'sometimes|required|image|mimes:png,jpg,jpeg|max:2048',
+                'photo' => 'sometimes|required|image|mimes:png,jpg,jpeg|max:5120',
             ]);
 
+            /**
+             * ===============================
+             * JIKA UPDATE FOTO FRAME
+             * ===============================
+             */
             if ($request->hasFile('photo')) {
-                // Hapus file photo lama dari storage jika ada
-                if ($frame->photo) {
+
+                // hapus foto lama
+                if ($frame->photo && Storage::disk('public')->exists($frame->photo)) {
                     Storage::disk('public')->delete($frame->photo);
                 }
-                $validated['photo'] = $request->file('photo')->store('frames', 'public');
+
+                // tentukan folder acara
+                $slugNamaAcara = Str::slug($frame->acara->nama_acara);
+                $framePath = "Acara/{$slugNamaAcara}-{$frame->acara->uid}/Frame";
+
+                // simpan foto baru
+                $validated['photo'] = $request->file('photo')->store(
+                    $framePath,
+                    'public'
+                );
             }
 
+            /**
+             * ===============================
+             * UPDATE DATA FRAME
+             * ===============================
+             */
             $frame->update($validated);
 
             return response()->json([
@@ -149,7 +208,7 @@ class FrameController extends Controller
     public function getByAcara($acara_uid)
     {
         try {
-            $acara = acara::where('uid', $acara_uid)->first();
+            $acara = Acara::where('uid', $acara_uid)->first();
 
             if (!$acara) {
                 return response()->json([
@@ -158,23 +217,15 @@ class FrameController extends Controller
                 ], 404);
             }
 
-            $frames = frame::where('acara_id', $acara->id)
+            $frames = Frame::where('acara_id', $acara->id)
                 ->orderBy('nama_frame')
                 ->get();
-
-            // Add full URL for frame images
-            $frames->transform(function ($frame) {
-                if ($frame->photo) {
-                    $frame->photo_url = url('storage/' . $frame->photo);
-                }
-                return $frame;
-            });
 
             return response()->json([
                 'success' => true,
                 'message' => 'Data Frame berhasil ditemukan',
                 'data' => $frames,
-            ], 200);
+            ], 200, [], JSON_UNESCAPED_SLASHES);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

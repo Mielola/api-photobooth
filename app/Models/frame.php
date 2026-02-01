@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Traits\HasUlid;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class frame extends Model
 {
@@ -14,6 +15,8 @@ class frame extends Model
 
     protected $hidden = ['id'];
 
+    protected $appends = ['photo_url'];
+
     protected $fillable = [
         'uid',
         'nama_frame',
@@ -23,4 +26,10 @@ class frame extends Model
         'created_at',
         'updated_at',
     ];
+    public function getPhotoUrlAttribute()
+    {
+        return $this->photo
+            ? Storage::disk('public')->url($this->photo)
+            : null;
+    }
 }

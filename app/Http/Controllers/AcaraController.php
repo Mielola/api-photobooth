@@ -174,19 +174,45 @@ class AcaraController extends Controller
     public function delete($uid)
     {
         DB::beginTransaction();
+
         try {
-            $acara = acara::where('uid', $uid)->first();
+            $acara = Acara::where('uid', $uid)->first();
+
             if (!$acara) {
-                return response()->json(['message' => 'Acara not found'], 404);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Acara not found'
+                ], 404);
             }
+
+            /**
+             * ===============================
+             * HAPUS FOLDER ACARA
+             * ===============================
+             */
+            $slugNamaAcara = Str::slug($acara->nama_acara);
+            $basePath = "Acara/{$slugNamaAcara}-{$acara->uid}";
+
+            if (Storage::disk('public')->exists($basePath)) {
+                Storage::disk('public')->deleteDirectory($basePath);
+            }
+
+            /**
+             * ===============================
+             * HAPUS DATA DB
+             * ===============================
+             */
             $acara->delete();
+
             DB::commit();
+
             return response()->json([
                 'success' => true,
-                'message' => 'Data Acara berhasil dihapus',
+                'message' => 'Data acara dan seluruh folder berhasil dihapus',
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal menghapus acara',
