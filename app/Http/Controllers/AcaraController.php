@@ -291,6 +291,44 @@ class AcaraController extends Controller
         return response()->download($zipPath)->deleteFileAfterSend(true);
     }
 
+    public function reprintLastSessionByUidSession($uidSession)
+    {
+        $session = session::where('uid', $uidSession)->firstOrFail();
+
+        $photos = SessionPhoto::where('table_session_photo.session_id', $session->id)
+            ->orderBy('table_session_photo.created_at', 'desc')
+            ->get();
+
+        if ($photos->isEmpty()) {
+            abort(404, 'Tidak ada foto');
+        }
+
+        $lastSessionId = $photos->first()->session_id;
+        $photos = $photos->where('session_id', $lastSessionId);
+
+        // 🔹 TEMP folder (bukan public)
+        $tempDir = storage_path('app/temp');
+        if (!file_exists($tempDir)) {
+            mkdir($tempDir, 0755, true);
+        }
+
+        $zipName = 'reprint-' . $session->uid . '-' . time() . '.zip';
+        $zipPath = $tempDir . '/' . $zipName;
+
+        $zip = new \ZipArchive();
+        $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+
+        foreach ($photos as $i => $photo) {
+            $zip->addFile(
+                storage_path('app/public/' . $photo->photo_path),
+                'foto-' . ($i + 1) . '.jpg'
+            );
+        }
+
+        $zip->close();
+        return response()->download($zipPath)->deleteFileAfterSend(true);
+    }
+
     public function resetSession($acaraUid)
     {
         DB::beginTransaction();

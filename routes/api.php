@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::get('/acara/{uid}/reprint', [AcaraController::class, 'reprintLastSession']);
+Route::get('/acara/{uid}/reprint/session', [AcaraController::class, 'reprintLastSessionByUidSession']);
 
 Route::prefix('client')->group(function () {
     // Public access untuk client photobooth
@@ -37,7 +38,6 @@ Route::prefix('client')->group(function () {
 
 // Route khusus untuk sudah terautentikasi
 Route::middleware('auth:sanctum')->group(function () {
-    // Acara
     Route::post('/acara/create', [AcaraController::class, 'create']);
     Route::delete('/acara/delete/{uid}', [AcaraController::class, 'delete']);
     Route::post('/acara/update/{uid}', [AcaraController::class, 'update']);
