@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('nama_pengantin', 255);
             $table->date('tanggal');
             $table->boolean('status')->default(false);
-            $table->string('background', 100)->nullable();
+            $table->string('background', 255)->nullable();
             $table->timestamps();
         });
     }

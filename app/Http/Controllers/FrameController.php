@@ -17,7 +17,7 @@ class FrameController extends Controller
             $validated = $request->validate([
                 'nama_frame' => 'required|string|max:100',
                 'jumlah_foto' => 'required|integer|min:1|max:10',
-                'photo' => 'required|image|mimes:png,jpg,jpeg|max:2048',
+                'photo' => 'required|image|mimes:png,jpg,jpeg|max:5120',
                 'acara_uid' => 'required|exists:table_acara,uid',
             ]);
 

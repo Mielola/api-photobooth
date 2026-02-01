@@ -8,6 +8,8 @@ use App\Models\sessionPhoto;
 use App\Models\session;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AcaraController extends Controller
@@ -24,16 +26,39 @@ class AcaraController extends Controller
                 'background' => 'required|image|mimes:jpg,jpeg,png,webp|max:2048',
             ]);
 
-            // Format tanggal ke 2000-01-01
+            // format tanggal
             $validatedData['tanggal'] = date('Y-m-d', strtotime($validatedData['tanggal']));
 
-            if ($request->hasFile('background')) {
-                $validatedData['background'] = $request
-                    ->file('background')
-                    ->store('acara/backgrounds', 'public');
-            }
-
+            // simpan acara ke DB dulu
             $acara = Acara::create($validatedData);
+
+            /**
+             * ===============================
+             * BUAT STRUKTUR FOLDER
+             * ===============================
+             */
+            $slugNamaAcara = Str::slug($acara->nama_acara);
+            $basePath = "Acara/{$slugNamaAcara}-{$acara->uid}";
+
+            Storage::disk('public')->makeDirectory($basePath);
+            Storage::disk('public')->makeDirectory("{$basePath}/Frame");
+            Storage::disk('public')->makeDirectory("{$basePath}/photos");
+
+            /**
+             * ===============================
+             * SIMPAN BACKGROUND KE FOLDER ACARA
+             * ===============================
+             */
+            if ($request->hasFile('background')) {
+                $backgroundPath = $request->file('background')->store(
+                    "{$basePath}/background",
+                    'public'
+                );
+
+                $acara->update([
+                    'background' => $backgroundPath
+                ]);
+            }
 
             DB::commit();
 
@@ -43,6 +68,8 @@ class AcaraController extends Controller
                 'data' => $acara,
             ], 201);
         } catch (ValidationException $e) {
+            DB::rollBack();
+
             return response()->json([
                 'success' => false,
                 'message' => 'validation failed',
@@ -58,6 +85,7 @@ class AcaraController extends Controller
             ], 500);
         }
     }
+
 
     public function index(Request $request)
     {
