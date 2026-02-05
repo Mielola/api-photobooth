@@ -107,7 +107,7 @@ class FrameController extends Controller
             'success' => true,
             'message' => 'Data Frame berhasil ditemukan',
             'data' => $frame,
-        ], 200);
+        ], 200, [], JSON_UNESCAPED_SLASHES);
     }
 
     public function delete($uid)
@@ -195,7 +195,7 @@ class FrameController extends Controller
                 'success' => true,
                 'message' => 'Data Frame berhasil diperbarui',
                 'data' => $frame,
-            ], 200);
+            ], 200, [], JSON_UNESCAPED_SLASHES);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

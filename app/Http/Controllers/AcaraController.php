@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use ZipArchive;
 
 class AcaraController extends Controller
 {
@@ -216,6 +217,77 @@ class AcaraController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal menghapus acara',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function downloadPhotosByAcara($acara_uid)
+    {
+        try {
+            $acara = Acara::where('uid', $acara_uid)->first();
+
+            if (!$acara) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Data Acara tidak ditemukan',
+                ], 404);
+            }
+
+            $slugNamaAcara = Str::slug($acara->nama_acara);
+            $photosPath = "Acara/{$slugNamaAcara}-{$acara->uid}/photos";
+
+            if (!Storage::disk('public')->exists($photosPath)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Folder foto tidak ditemukan',
+                ], 404);
+            }
+
+            /**
+             * ===============================
+             * SIAPKAN FILE ZIP
+             * ===============================
+             */
+            $zipFileName = "{$slugNamaAcara}-{$acara->uid}-photos.zip";
+            $zipFullPath = storage_path("app/tmp/{$zipFileName}");
+
+            // pastikan folder tmp ada
+            if (!file_exists(dirname($zipFullPath))) {
+                mkdir(dirname($zipFullPath), 0755, true);
+            }
+
+            $zip = new ZipArchive;
+            if ($zip->open($zipFullPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+                throw new \Exception('Gagal membuat file ZIP');
+            }
+
+            /**
+             * ===============================
+             * MASUKKAN SEMUA FILE FOTO
+             * ===============================
+             */
+            $files = Storage::disk('public')->allFiles($photosPath);
+
+            foreach ($files as $file) {
+                $absolutePath = storage_path("app/public/{$file}");
+                $relativePath = str_replace($photosPath . '/', '', $file);
+
+                $zip->addFile($absolutePath, $relativePath);
+            }
+
+            $zip->close();
+
+            /**
+             * ===============================
+             * DOWNLOAD + AUTO DELETE
+             * ===============================
+             */
+            return response()->download($zipFullPath)->deleteFileAfterSend(true);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mendownload foto',
                 'error' => $e->getMessage(),
             ], 500);
         }

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Route;
 Route::post('/login', [AuthController::class, 'login']);
 Route::get('/acara/{uid}/reprint', [AcaraController::class, 'reprintLastSession']);
 Route::get('/acara/{uid}/reprint/session', [AcaraController::class, 'reprintLastSessionByUidSession']);
+Route::get('/acara/{uid}/download-photos', [AcaraController::class, 'downloadPhotosByAcara']);
 
 Route::prefix('client')->group(function () {
     // Public access untuk client photobooth
