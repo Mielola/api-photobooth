@@ -327,16 +327,19 @@ class AcaraController extends Controller
         }
     }
 
-    public function getActive()
+    public function getActive(Request $request)
     {
         try {
+            $perPage = $request->query('per_page', 5); // Default 5 item per halaman
+            $page = $request->query('page', 1);
+
             $acaras = acara::where('status', 'active')
                 ->orWhere('status', 'maintenance')
                 ->orderByDesc('tanggal')
-                ->get();
+                ->paginate($perPage);
 
             // Add full URL for background images
-            $acaras->transform(function ($acara) {
+            $acaras->getCollection()->transform(function ($acara) {
                 if ($acara->background) {
                     $acara->background_url = asset('storage/' . $acara->background);
                 }
@@ -346,7 +349,15 @@ class AcaraController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Data Acara aktif berhasil ditemukan',
-                'data' => $acaras,
+                'data' => $acaras->items(),
+                'pagination' => [
+                    'current_page' => $acaras->currentPage(),
+                    'per_page' => $acaras->perPage(),
+                    'total' => $acaras->total(),
+                    'last_page' => $acaras->lastPage(),
+                    'from' => $acaras->firstItem(),
+                    'to' => $acaras->lastItem(),
+                ]
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
