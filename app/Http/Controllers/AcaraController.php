@@ -98,7 +98,8 @@ class AcaraController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('nama_acara', 'like', '%' . $search . '%')
-                    ->orWhere('nama_pengantin', 'like', '%' . $search . '%');
+                    ->orWhere('nama_pengantin_pria', 'like', '%' . $search . '%')
+                    ->orWhere('nama_pengantin_wanita', 'like', '%' . $search . '%');
             });
         }
 
