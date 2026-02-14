@@ -19,6 +19,9 @@ Route::prefix('client')->group(function () {
     Route::get('/frame/by-acara/{acara_uid}', [FrameController::class, 'getByAcara']);
     Route::post('/photo/send', [PhotoController::class, 'sendPhoto']);
 
+    // Acara
+    Route::post('acara/{uid}/check', [AcaraController::class, 'checkStatusAcara']);
+
     // Session
     Route::post('/session/create', [SessionController::class, 'create']);
     Route::get('/session/{uid}', [SessionController::class, 'show']);

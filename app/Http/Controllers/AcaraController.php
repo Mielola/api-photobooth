@@ -22,7 +22,8 @@ class AcaraController extends Controller
         try {
             $validatedData = $request->validate([
                 'nama_acara' => 'required|string|max:255',
-                'nama_pengantin' => 'required|string|max:255',
+                'nama_pengantin_pria' => 'required|string|max:255',
+                'nama_pengantin_wanita' => 'required|string|max:255',
                 'tanggal' => 'required|date',
                 'background' => 'required|image|mimes:jpg,jpeg,png,webp|max:2048',
             ]);
@@ -304,7 +305,8 @@ class AcaraController extends Controller
 
             $validatedData = $request->validate([
                 'nama_acara' => 'sometimes|required|string|max:255',
-                'nama_pengantin' => 'sometimes|required|string|max:255',
+                'nama_pengantin_pria' => 'sometimes|required|string|max:255',
+                'nama_pengantin_wanita' => 'sometimes|required|string|max:255',
                 'tanggal' => 'sometimes|required|date',
                 'background' => 'sometimes|nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
             ]);
@@ -328,7 +330,8 @@ class AcaraController extends Controller
     public function getActive()
     {
         try {
-            $acaras = acara::where('status', true)
+            $acaras = acara::where('status', 'active')
+                ->orWhere('status', 'maintenance')
                 ->orderByDesc('tanggal')
                 ->get();
 
@@ -354,21 +357,68 @@ class AcaraController extends Controller
         }
     }
 
-    public function setStatusEvent($uid)
+    public function checkStatusAcara($uid)
     {
         try {
-            $acara = acara::where('uid', $uid)->first();
-            if (!$acara) {
-                return response()->json(['message' => 'Acara not found'], 404);
+            $status = Acara::where('uid', $uid)->value('status');
+
+            if (!$status) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Data Acara tidak ditemukan',
+                ], 404);
             }
-            $acara->status = !$acara->status;
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Status acara berhasil ditemukan',
+                'data' => $status,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil status acara',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function setStatusEvent(Request $request, $uid)
+    {
+        if (!$request->has('status')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Status acara harus diisi',
+            ], 422);
+        }
+        $status = [
+            'active',
+            'maintenance',
+            'inactive'
+        ];
+
+        if (!in_array($request->status, $status)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Status acara tidak valid. Pilihan: active, maintenance, inactive',
+            ], 422);
+        }
+
+        try {
+            $acara = Acara::where('uid', $uid)->firstOrFail();
+
+            $request->validate([
+                'status' => 'required|in:active,maintenance,inactive',
+            ]);
+
+            $acara->status = $request->status;
             $acara->save();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Status acara berhasil diubah',
                 'data' => $acara->status,
-            ], 200);
+            ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

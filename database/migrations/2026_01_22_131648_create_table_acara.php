@@ -15,9 +15,14 @@ return new class extends Migration
             $table->id();
             $table->ulid('uid')->unique();
             $table->string('nama_acara', 255);
-            $table->string('nama_pengantin', 255);
+            $table->string('nama_pengantin_pria', 255);
+            $table->string('nama_pengantin_wanita', 255);
             $table->date('tanggal');
-            $table->boolean('status')->default(false);
+            $table->enum('status', [
+                'active',
+                'maintenance',
+                'inactive'
+            ])->default('inactive');
             $table->string('background', 255)->nullable();
             $table->timestamps();
         });

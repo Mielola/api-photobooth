@@ -16,7 +16,8 @@ class acara extends Model
     protected $fillable = [
         'uid',
         'nama_acara',
-        'nama_pengantin',
+        'nama_pengantin_pria',
+        'nama_pengantin_wanita',
         'tanggal',
         'status',
         'background',
