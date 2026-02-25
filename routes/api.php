@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\FrameController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\PhotoController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);
@@ -50,6 +51,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/acara/photos', [AcaraController::class, 'getSessionPhoto']);
     Route::post('/acara/reset/{uid}', [AcaraController::class, 'resetSession']);
     Route::post('/acara/status/update/{uid}', [AcaraController::class, 'setStatusEvent']);
+
+    // User
+    Route::get('/user/profile', [UserController::class, 'index']);
 
     // Frame
     Route::post('/frame/create', [FrameController::class, 'create']);

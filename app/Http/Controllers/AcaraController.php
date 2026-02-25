@@ -326,9 +326,11 @@ class AcaraController extends Controller
 
     public function update(Request $request, $uid)
     {
+        DB::beginTransaction();
+
         try {
-            DB::beginTransaction();
-            $acara = acara::where('uid', $uid)->first();
+            $acara = Acara::where('uid', $uid)->first();
+
             if (!$acara) {
                 return response()->json(['message' => 'Acara not found'], 404);
             }
@@ -341,19 +343,63 @@ class AcaraController extends Controller
                 'background' => 'sometimes|nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
             ]);
 
+            // ===============================
+            // CEK PERUBAHAN NAMA ACARA
+            // ===============================
+            $oldSlug = Str::slug($acara->nama_acara);
+            $newSlug = isset($validatedData['nama_acara'])
+                ? Str::slug($validatedData['nama_acara'])
+                : $oldSlug;
+
+            $oldBasePath = "Acara/{$oldSlug}-{$acara->uid}";
+            $newBasePath = "Acara/{$newSlug}-{$acara->uid}";
+
+            if ($oldBasePath !== $newBasePath && Storage::disk('public')->exists($oldBasePath)) {
+                Storage::disk('public')->move($oldBasePath, $newBasePath);
+
+                // update path background lama kalau ada
+                if ($acara->background) {
+                    $validatedData['background'] = str_replace(
+                        $oldBasePath,
+                        $newBasePath,
+                        $acara->background
+                    );
+                }
+            }
+
+            // ===============================
+            // UPLOAD BACKGROUND BARU
+            // ===============================
             if ($request->hasFile('background')) {
-                $validatedData['background'] = $request
-                    ->file('background')
-                    ->store('acara/backgrounds', 'public');
+
+                // hapus background lama
+                if ($acara->background && Storage::disk('public')->exists($acara->background)) {
+                    Storage::disk('public')->delete($acara->background);
+                }
+
+                $backgroundPath = $request->file('background')->store(
+                    "{$newBasePath}/background",
+                    'public'
+                );
+
+                $validatedData['background'] = $backgroundPath;
             }
 
             $acara->update($validatedData);
 
             DB::commit();
-            return response()->json(['message' => 'Acara updated successfully', 'data' => $acara], 200);
+
+            return response()->json([
+                'message' => 'Acara updated successfully',
+                'data' => $acara
+            ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => 'Update failed', 'error' => $e->getMessage()], 500);
+
+            return response()->json([
+                'message' => 'Update failed',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 
