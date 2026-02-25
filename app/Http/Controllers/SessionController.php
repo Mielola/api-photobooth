@@ -251,55 +251,55 @@ class SessionController extends Controller
      * Cek status aktif session
      */
     public function checkActive($uid)
-{
-    try {
-        $session = session::where('uid', $uid)->first();
+    {
+        try {
+            $session = session::where('uid', $uid)->first();
 
-        if (!$session) {
+            if (!$session) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Session tidak ditemukan',
+                ], 404);
+            }
+
+            $now = Carbon::now();
+            $expiredTime = Carbon::parse($session->expired_time);
+
+            // Cek apakah session expired atau sudah direset
+            // Jika expired_time < sekarang, berarti sudah tidak aktif
+            $isActive = $expiredTime->greaterThan($now);
+
+            // Cek juga apakah expired_time adalah tahun 1999 (direset manual)
+            $isReset = $expiredTime->year === 1999;
+
+            if ($isReset) {
+                $message = 'Session telah direset oleh admin';
+            } elseif (!$isActive) {
+                $message = 'Session telah expired';
+            } else {
+                $message = 'Session masih aktif';
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'data' => [
+                    'session_uid' => $session->uid,
+                    'is_active' => $isActive && !$isReset,
+                    'is_reset' => $isReset,
+                    'expired_time' => $expiredTime->toIso8601String(),
+                    'expired_timestamp' => $expiredTime->timestamp * 1000,
+                    'remaining_seconds' => $isActive ? $now->diffInSeconds($expiredTime) : 0,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Session tidak ditemukan',
-            ], 404);
+                'message' => 'Gagal memeriksa status session',
+                'error' => $e->getMessage(),
+            ], 500);
         }
-
-        $now = Carbon::now();
-        $expiredTime = Carbon::parse($session->expired_time);
-
-        // Cek apakah session expired atau sudah direset
-        // Jika expired_time < sekarang, berarti sudah tidak aktif
-        $isActive = $expiredTime->greaterThan($now);
-
-        // Cek juga apakah expired_time adalah tahun 1999 (direset manual)
-        $isReset = $expiredTime->year === 1999;
-
-        if ($isReset) {
-            $message = 'Session telah direset oleh admin';
-        } elseif (!$isActive) {
-            $message = 'Session telah expired';
-        } else {
-            $message = 'Session masih aktif';
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => $message,
-            'data' => [
-                'session_uid' => $session->uid,
-                'is_active' => $isActive && !$isReset,
-                'is_reset' => $isReset,
-                'expired_time' => $expiredTime->toIso8601String(),
-                'expired_timestamp' => $expiredTime->timestamp * 1000,
-                'remaining_seconds' => $isActive ? $now->diffInSeconds($expiredTime) : 0,
-            ],
-        ], 200);
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Gagal memeriksa status session',
-            'error' => $e->getMessage(),
-        ], 500);
     }
-}
 
     /**
      * Perpanjang waktu session
@@ -450,7 +450,7 @@ class SessionController extends Controller
     /**
      * Get sessions by Acara UID (untuk admin dashboard)
      */
-    public function getByAcaraUid($acaraUid)
+    public function getByAcaraUid(Request $request, $acaraUid)
     {
         try {
             // Cari acara berdasarkan UID
@@ -463,29 +463,54 @@ class SessionController extends Controller
                 ], 404);
             }
 
-            // Ambil semua session berdasarkan acara_id
-            $sessions = session::where('acara_id', $acara->id)
-                ->orderBy('created_at', 'desc')
-                ->get()
-                ->map(function($session) {
-                    $now = Carbon::now();
-                    $expiredTime = Carbon::parse($session->expired_time);
+            // Ambil parameter pagination
+            $perPage = $request->input('per_page', 10);
+            $page = $request->input('page', 1);
+            $search = $request->input('search', '');
 
-                    return [
-                        'session_uid' => $session->uid,
-                        'email' => $session->email,
-                        'is_active' => $expiredTime->greaterThan($now) && $expiredTime->year !== 1999,
-                        'is_reset' => $expiredTime->year === 1999,
-                        'created_at' => $session->created_at->toIso8601String(),
-                        'session_start' => $session->session_start,
-                        'session_end' => $expiredTime->toIso8601String(),
-                    ];
+            // Query sessions berdasarkan acara_id
+            $query = session::where('acara_id', $acara->id)
+                ->orderBy('created_at', 'desc');
+
+            // Search by email atau session_uid jika ada
+            if ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('uid', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
                 });
+            }
+
+            // Pagination
+            $sessions = $query->paginate($perPage, ['*'], 'page', $page);
+
+            // Transform data
+            $transformedData = $sessions->getCollection()->map(function ($session) {
+                $now = Carbon::now();
+                $expiredTime = Carbon::parse($session->expired_time);
+
+                return [
+                    'session_uid' => $session->uid,
+                    'email' => $session->email,
+                    'is_active' => $expiredTime->greaterThan($now) && $expiredTime->year !== 1999,
+                    'is_reset' => $expiredTime->year === 1999,
+                    'created_at' => $session->created_at->toIso8601String(),
+                    'session_start' => $session->session_start,
+                    'session_end' => $expiredTime->toIso8601String(),
+                ];
+            });
 
             return response()->json([
                 'success' => true,
                 'message' => 'Data session berhasil diambil',
-                'data' => $sessions,
+                'data' => $transformedData,
+                'pagination' => [
+                    'current_page' => $sessions->currentPage(),
+                    'per_page' => $sessions->perPage(),
+                    'total' => $sessions->total(),
+                    'last_page' => $sessions->lastPage(),
+                    'from' => $sessions->firstItem(),
+                    'to' => $sessions->lastItem(),
+                ]
             ], 200);
 
         } catch (\Exception $e) {
