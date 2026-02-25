@@ -144,16 +144,6 @@ class AcaraController extends Controller
                     return $acara;
                 })
                 ->first();
-            $sessionPhoto = sessionPhoto::join('table_session', 'table_session_photo.session_id', '=', 'table_session.id')
-                ->where('table_session.acara_id', $acara->id)
-                ->select('table_session_photo.*')
-                ->orderByDesc('table_session_photo.created_at')
-                ->get()
-                ->map(function ($photo) {
-                    $photo->photo_url = asset('storage/' . $photo->photo_path);
-                    return $photo;
-                });
-            $acara->session_photos = $sessionPhoto;
             $frame = frame::where('acara_id', $acara->id)->get();
             $acara->frame = $frame;
 
@@ -172,6 +162,45 @@ class AcaraController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    public function getSessionPhoto(Request $request)
+    {
+        $perPage = $request->query('per_page', 10);
+        $acaraUid = $request->query('acara_uid');
+
+        if (!$acaraUid) {
+            return response()->json([
+                'success' => false,
+                'message' => 'acara_uid wajib diisi'
+            ], 400);
+        }
+
+        $acara = DB::table('table_acara')->where('uid', $acaraUid)->first();
+
+        if (!$acara) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Acara tidak ditemukan'
+            ], 404);
+        }
+
+        $sessionPhoto = sessionPhoto::join('table_session', 'table_session_photo.session_id', '=', 'table_session.id')
+            ->where('table_session.acara_id', $acara->id)
+            ->select('table_session_photo.*', 'table_session.acara_id')
+            ->orderByDesc('table_session_photo.created_at')
+            ->paginate($perPage);
+
+        $sessionPhoto->getCollection()->transform(function ($photo) {
+            $photo->photo_url = asset('storage/' . $photo->photo_path);
+            return $photo;
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data Session Photo berhasil ditemukan',
+            'data' => $sessionPhoto,
+        ], 200);
     }
 
     public function delete($uid)
