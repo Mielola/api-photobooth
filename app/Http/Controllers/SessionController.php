@@ -446,4 +446,85 @@ class SessionController extends Controller
             'message' => 'Session berhasil dihapus',
         ], 200);
     }
+
+    /**
+     * Get sessions by Acara UID (untuk admin dashboard)
+     */
+    public function getByAcaraUid($acaraUid)
+    {
+        try {
+            // Cari acara berdasarkan UID
+            $acara = acara::where('uid', $acaraUid)->first();
+
+            if (!$acara) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Acara tidak ditemukan',
+                ], 404);
+            }
+
+            // Ambil semua session berdasarkan acara_id
+            $sessions = session::where('acara_id', $acara->id)
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(function($session) {
+                    $now = Carbon::now();
+                    $expiredTime = Carbon::parse($session->expired_time);
+
+                    return [
+                        'session_uid' => $session->uid,
+                        'email' => $session->email,
+                        'is_active' => $expiredTime->greaterThan($now) && $expiredTime->year !== 1999,
+                        'is_reset' => $expiredTime->year === 1999,
+                        'created_at' => $session->created_at->toIso8601String(),
+                        'session_start' => $session->session_start,
+                        'session_end' => $expiredTime->toIso8601String(),
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data session berhasil diambil',
+                'data' => $sessions,
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data session',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete session by UID
+     */
+    public function destroy($sessionUid)
+    {
+        try {
+            $session = session::where('uid', $sessionUid)->first();
+
+            if (!$session) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Session tidak ditemukan',
+                ], 404);
+            }
+
+            $session->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Session berhasil dihapus',
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghapus session',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }

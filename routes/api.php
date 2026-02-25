@@ -57,4 +57,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/frame/{uid}', [FrameController::class, 'show']);
     Route::delete('/frame/delete/{uid}', [FrameController::class, 'delete']);
     Route::post('/frame/update/{uid}', [FrameController::class, 'update']);
+
+    Route::get('/acara/{acara_uid}/sessions', [SessionController::class, 'getByAcaraUid']);
+    Route::delete('/session/{session_uid}', [SessionController::class, 'destroy']);
 });
