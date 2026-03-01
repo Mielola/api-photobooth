@@ -617,7 +617,14 @@ class AcaraController extends Controller
             if (!$session->expired_time || $session->expired_time < now()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Sesi terakhir sudah direset',
+                    'message' => 'Sesi sudah berakhir, tidak bisa direset',
+                ], 400);
+            }
+
+            if ($session->email) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Sesi terakhir sudah berakhir, tidak bisa direset',
                 ], 400);
             }
 
