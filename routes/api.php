@@ -3,6 +3,7 @@
 use App\Http\Controllers\AcaraController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\FrameController;
+use App\Http\Controllers\OtpController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\PhotoController;
 use App\Http\Controllers\UserController;
@@ -12,6 +13,12 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::get('/acara/{uid}/reprint', [AcaraController::class, 'reprintLastSession']);
 Route::get('/acara/{uid}/reprint/session', [AcaraController::class, 'reprintLastSessionByUidSession']);
 Route::get('/acara/{uid}/download-photos', [AcaraController::class, 'downloadPhotosByAcara']);
+
+
+// Reset Password
+Route::post('/otp/send', [OtpController::class, 'sendOtp']);
+Route::post('/otp/verify', [OtpController::class, 'verifyOtp']);
+Route::post('/otp/reset-password', [OtpController::class, 'resetPassword']);
 
 Route::prefix('client')->group(function () {
     // Public access untuk client photobooth
