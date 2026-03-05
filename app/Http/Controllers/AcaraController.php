@@ -90,47 +90,47 @@ class AcaraController extends Controller
 
 
     public function index(Request $request)
-    {
-        $perPage = $request->query('per_page', 10);
-        $query = acara::query();
-        $search = $request->query('search');
+{
+    $perPage = $request->query('per_page', 10);
+    $query = acara::query();
+    $search = strtolower($request->query('search'));
 
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('nama_acara', 'like', '%' . $search . '%')
-                    ->orWhere('nama_pengantin_pria', 'like', '%' . $search . '%')
-                    ->orWhere('nama_pengantin_wanita', 'like', '%' . $search . '%');
-            });
-        }
-
-        $acaras = $query->orderByDesc('created_at')->paginate($perPage);
-
-        // Ambil 1 foto terakhir per acara
-        $acaraIds = $acaras->pluck('id');
-        $sessionPhoto = sessionPhoto::join('table_session', 'table_session_photo.session_id', '=', 'table_session.id')
-            ->join('table_acara', 'table_session.acara_id', '=', 'table_acara.id')
-            ->whereIn('table_session.acara_id', $acaraIds)
-            ->select('table_session_photo.*', 'table_session.acara_id', 'table_acara.uid as acara_uid')
-            ->whereIn('table_session_photo.id', function ($query) use ($acaraIds) {
-                $query->select(DB::raw('MAX(table_session_photo.id)'))
-                    ->from('table_session_photo')
-                    ->join('table_session', 'table_session_photo.session_id', '=', 'table_session.id')
-                    ->whereIn('table_session.acara_id', $acaraIds)
-                    ->groupBy('table_session.acara_id');
-            })
-            ->get()
-            ->map(function ($photo) {
-                $photo->photo_url = asset('storage/' . $photo->photo_path);
-                return $photo;
-            });
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Data Acara berhasil ditemukan',
-            'data' => $acaras,
-            'session_photos' => $sessionPhoto,
-        ], 200);
+    if ($search) {
+        $query->where(function ($q) use ($search) {
+            $q->whereRaw('LOWER(nama_acara) LIKE ?', ['%' . $search . '%'])
+              ->orWhereRaw('LOWER(nama_pengantin_pria) LIKE ?', ['%' . $search . '%'])
+              ->orWhereRaw('LOWER(nama_pengantin_wanita) LIKE ?', ['%' . $search . '%']);
+        });
     }
+
+    $acaras = $query->orderByDesc('created_at')->paginate($perPage);
+
+    $acaraIds = $acaras->pluck('id');
+
+    $sessionPhoto = sessionPhoto::join('table_session', 'table_session_photo.session_id', '=', 'table_session.id')
+        ->join('table_acara', 'table_session.acara_id', '=', 'table_acara.id')
+        ->whereIn('table_session.acara_id', $acaraIds)
+        ->select('table_session_photo.*', 'table_session.acara_id', 'table_acara.uid as acara_uid')
+        ->whereIn('table_session_photo.id', function ($query) use ($acaraIds) {
+            $query->select(DB::raw('MAX(table_session_photo.id)'))
+                ->from('table_session_photo')
+                ->join('table_session', 'table_session_photo.session_id', '=', 'table_session.id')
+                ->whereIn('table_session.acara_id', $acaraIds)
+                ->groupBy('table_session.acara_id');
+        })
+        ->get()
+        ->map(function ($photo) {
+            $photo->photo_url = asset('storage/' . $photo->photo_path);
+            return $photo;
+        });
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Data Acara berhasil ditemukan',
+        'data' => $acaras,
+        'session_photos' => $sessionPhoto,
+    ], 200);
+}
 
     public function show($uid)
     {
