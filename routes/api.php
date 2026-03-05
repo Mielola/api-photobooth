@@ -71,4 +71,5 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/acara/{acara_uid}/sessions', [SessionController::class, 'getByAcaraUid']);
     Route::delete('/session/{session_uid}', [SessionController::class, 'destroy']);
+    Route::get('acara/{acara_uid}/sessions/export', [SessionController::class, 'exportToExcel']);
 });

@@ -10,6 +10,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
 
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+
 class SessionController extends Controller
 {
     /**
@@ -548,6 +554,132 @@ class SessionController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal menghapus session',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    public function exportToExcel($acaraUid)
+    {
+        try {
+            // Cari acara berdasarkan UID
+            $acara = acara::where('uid', $acaraUid)->first();
+
+            if (!$acara) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Acara tidak ditemukan',
+                ], 404);
+            }
+
+            // Ambil semua sessions untuk acara ini
+            $sessions = session::where('acara_id', $acara->id)
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            if ($sessions->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tidak ada data session untuk di-export',
+                ], 404);
+            }
+
+            // Buat Spreadsheet baru
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            // Set judul worksheet
+            $sheet->setTitle('Sessions');
+
+            // Header Excel
+            $sheet->setCellValue('A1', 'No');
+            $sheet->setCellValue('B1', 'Session ID');
+            $sheet->setCellValue('C1', 'Email Client');
+            $sheet->setCellValue('D1', 'Waktu Mulai');
+            $sheet->setCellValue('E1', 'Waktu Selesai');
+
+            // Styling header
+            $headerStyle = [
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF'],
+                    'size' => 12,
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '6A9C89'],
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => Border::BORDER_THIN,
+                    ],
+                ],
+            ];
+            $sheet->getStyle('A1:E1')->applyFromArray($headerStyle);
+
+            // Set lebar kolom
+            $sheet->getColumnDimension('A')->setWidth(5);
+            $sheet->getColumnDimension('B')->setWidth(35);
+            $sheet->getColumnDimension('C')->setWidth(30);
+            $sheet->getColumnDimension('D')->setWidth(20);
+            $sheet->getColumnDimension('E')->setWidth(20);
+
+            // Isi data
+            $row = 2;
+            foreach ($sessions as $index => $session) {
+                $now = Carbon::now();
+                $expiredTime = Carbon::parse($session->expired_time);
+                $isActive = $expiredTime->greaterThan($now) && $expiredTime->year !== 1999;
+                $isReset = $expiredTime->year === 1999;
+
+                $status = $isReset ? 'Reset' : ($isActive ? 'Aktif' : 'Expired');
+
+                $sheet->setCellValue('A' . $row, $index + 1);
+                $sheet->setCellValue('B' . $row, $session->uid);
+                $sheet->setCellValue('C' . $row, $session->email ?: '-');
+                $sheet->setCellValue('D' . $row, $session->created_at->format('d/m/Y H:i:s'));
+                $sheet->setCellValue('E' . $row, $expiredTime->format('d/m/Y H:i:s'));
+                $row++;
+            }
+
+            // Styling untuk body
+            $bodyStyle = [
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => Border::BORDER_THIN,
+                        'color' => ['rgb' => 'CCCCCC'],
+                    ],
+                ],
+                'alignment' => [
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
+            ];
+            $sheet->getStyle('A1:F' . ($row - 1))->applyFromArray($bodyStyle);
+
+            // Alignment untuk kolom nomor dan status
+            $sheet->getStyle('A2:A' . ($row - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('F2:F' . ($row - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            // Generate filename
+            $filename = 'Session_' . str_replace(' ', '_', $acara->nama_acara) . '_' . date('Y-m-d_His') . '.xlsx';
+
+            // Set headers untuk download
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment;filename="' . $filename . '"');
+            header('Cache-Control: max-age=0');
+
+            // Write file ke output
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+            exit;
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal export data session',
                 'error' => $e->getMessage(),
             ], 500);
         }
