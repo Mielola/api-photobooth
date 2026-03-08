@@ -14,6 +14,14 @@ Route::get('/acara/{uid}/reprint', [AcaraController::class, 'reprintLastSession'
 Route::get('/acara/{uid}/reprint/session', [AcaraController::class, 'reprintLastSessionByUidSession']);
 Route::get('/acara/{uid}/download-photos', [AcaraController::class, 'downloadPhotosByAcara']);
 
+Route::get('/check-upload-limit', function () {
+    return [
+        'post_max_size' => ini_get('post_max_size'),
+        'upload_max_filesize' => ini_get('upload_max_filesize'),
+        'memory_limit' => ini_get('memory_limit'),
+    ];
+});
+
 
 // Reset Password
 Route::post('/otp/send', [OtpController::class, 'sendOtp']);

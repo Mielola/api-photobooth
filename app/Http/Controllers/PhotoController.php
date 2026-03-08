@@ -617,8 +617,9 @@ class PhotoController extends Controller
 
             $request->validate([
                 'raw_photos' => 'required|array|min:1|max:3',
-                'raw_photos.*' => 'required|image|mimes:png|max:2048',
-                'frame_photo' => 'required|image|mimes:png|max:2048',
+                'raw_photos.*' => 'required|image|mimes:png|max:10240',
+                'frame_photo' => 'required|image|mimes:png|max:10240',
+                'gif_photo' => 'nullable|image|mimes:gif|max:10240',
                 'email' => 'required|email',
                 'session_uid' => 'required|string|exists:table_session,uid',
             ]);
@@ -666,6 +667,20 @@ class PhotoController extends Controller
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
+
+            // Simpan GIF photo jika ada
+            if ($request->hasFile('gif_photo')) {
+                $gifFilename = 'gif_' . time() . '_' . uniqid() . '.gif';
+                $gifPhotoPath = $request->gif_photo->storeAs($folderPath, $gifFilename, 'public');
+                $photosToInsert[] = [
+                    'uid' => (string) Str::ulid(),
+                    'session_id' => $session->id,
+                    'photo_path' => $gifPhotoPath,
+                    'type' => 'gif',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
 
             // Insert massal
             SessionPhoto::insert($photosToInsert);
