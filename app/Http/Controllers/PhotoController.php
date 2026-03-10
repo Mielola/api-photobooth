@@ -624,23 +624,54 @@ class PhotoController extends Controller
                 'session_uid' => 'required|string|exists:table_session,uid',
             ]);
 
-            // Ambil session dengan acara
+            // Lock session supaya aman dari double request bersamaan
             $session = Session::where('uid', $request->session_uid)
                 ->with('acara')
+                ->lockForUpdate()
                 ->firstOrFail();
 
-            // Update email pada session
+            // Hitung foto existing
+            $existingPhotoCount = SessionPhoto::where('session_id', $session->id)->count();
+
+            // Jika sudah ada 5 foto, stop
+            if ($existingPhotoCount >= 5) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Foto untuk session ini sudah lengkap, tidak boleh upload ulang',
+                ], 409);
+            }
+
+            // Hitung total incoming
+            $incomingCount = count($request->raw_photos) + 1; // frame wajib
+
+            if ($request->hasFile('gif_photo')) {
+                $incomingCount += 1;
+            }
+
+            // Cegah melebihi 5 total
+            if (($existingPhotoCount + $incomingCount) > 5) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Total foto melebihi batas maksimal 5 file',
+                ], 422);
+            }
+
+            // Update email
             $session->update([
                 'email' => $request->email,
             ]);
 
-            // Buat path folder sesuai struktur: Acara/{namaAcara}-{uid}/photos/{uidSession}
+            // Folder path
             $slugNamaAcara = Str::slug($session->acara->nama_acara);
             $folderPath = "Acara/{$slugNamaAcara}-{$session->acara->uid}/photos/{$session->uid}";
 
             $photosToInsert = [];
 
-            // Simpan RAW photos
+            // RAW photos
             foreach ($request->raw_photos as $index => $rawPhoto) {
                 $filename = 'raw_' . time() . '_' . ($index + 1) . '_' . uniqid() . '.png';
                 $rawPhotoPath = $rawPhoto->storeAs($folderPath, $filename, 'public');
@@ -655,7 +686,7 @@ class PhotoController extends Controller
                 ];
             }
 
-            // Simpan FRAMED photo
+            // FRAMED
             $framedFilename = 'framed_' . time() . '_' . uniqid() . '.png';
             $framedPhotoPath = $request->frame_photo->storeAs($folderPath, $framedFilename, 'public');
 
@@ -668,10 +699,11 @@ class PhotoController extends Controller
                 'updated_at' => now(),
             ];
 
-            // Simpan GIF photo jika ada
+            // GIF
             if ($request->hasFile('gif_photo')) {
                 $gifFilename = 'gif_' . time() . '_' . uniqid() . '.gif';
                 $gifPhotoPath = $request->gif_photo->storeAs($folderPath, $gifFilename, 'public');
+
                 $photosToInsert[] = [
                     'uid' => (string) Str::ulid(),
                     'session_id' => $session->id,
@@ -682,7 +714,6 @@ class PhotoController extends Controller
                 ];
             }
 
-            // Insert massal
             SessionPhoto::insert($photosToInsert);
 
             DB::commit();
