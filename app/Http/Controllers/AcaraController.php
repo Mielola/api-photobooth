@@ -25,7 +25,7 @@ class AcaraController extends Controller
                 'nama_pengantin_pria' => 'required|string|max:255',
                 'nama_pengantin_wanita' => 'required|string|max:255',
                 'tanggal' => 'required|date',
-                'background' => 'required|image|mimes:jpg,jpeg,png,webp|max:2048',
+                'background' => 'required|image|mimes:jpg,jpeg,png,webp|max:5120',
             ]);
 
             // format tanggal
@@ -340,7 +340,7 @@ class AcaraController extends Controller
                 'nama_pengantin_pria' => 'sometimes|required|string|max:255',
                 'nama_pengantin_wanita' => 'sometimes|required|string|max:255',
                 'tanggal' => 'sometimes|required|date',
-                'background' => 'sometimes|nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+                'background' => 'sometimes|nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
             ]);
 
             // ===============================
